@@ -12,7 +12,11 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <pwd.h>
+#include <grp.h>
 #include <httpd.h>
 
 #include "main.h"
@@ -23,6 +27,10 @@ int port = DEFAULT_PORT;
 char *base = DEFAULT_BASE;
 char *response_file = NULL;
 char *index_file = DEFAULT_INDEX;
+char *pid_file = DEFAULT_PID;
+char *uid = NULL;
+char *gid = NULL;
+int foreground = 0;
 httpd *server;
 request *req;
 
@@ -56,8 +64,9 @@ void null() {
 			}
 
 			char length[BUFFER_LENGTH];
-			snprintf(length, BUFFER_LENGTH, "Content-Length: %lld", sbuf.st_size);
-			httpdAddHeader(req, length);
+			if (snprintf(length, BUFFER_LENGTH, "Content-Length: %lld", sbuf.st_size) <= BUFFER_LENGTH - 1) {
+				httpdAddHeader(req, length);
+			}
 			httpdSendHeaders(req);
 			_httpd_catFile(req, response_file);
 			return;
@@ -69,18 +78,25 @@ void null() {
 }
 
 void help() {
-	fprintf(stderr, "%s [-h <host>] [-p <port>] [-b <base>] [-r <response>] [-i <index>]\n", program_name);
+	fprintf(stderr, "%s [-h <host>] [-p <port>] [-b <base>] [-r <response>] [-i <index>] [-d <pid>] [-u <uid>] [-g <gid>] [-f]\n", program_name);
 	fprintf(stderr, "  -h <host>      to which <host> to bind (default: all available)\n");
-	fprintf(stderr, "  -p <port>      to which <port> to bind (default: %d)\n", DEFAULT_PORT);
+	fprintf(stderr, "  -p <port>      to which <port> to bind (default: %u)\n", DEFAULT_PORT);
 	fprintf(stderr, "  -b <base>      <base> directory to use (default: %s)\n", DEFAULT_BASE);
 	fprintf(stderr, "  -r <response>  send <response> file as a response (default: empty response)\n");
 	fprintf(stderr, "  -i <index>     send <index> file as a directory response (default: %s)\n", DEFAULT_INDEX);
+	fprintf(stderr, "  -d <pid>       store PID into <pid> file (default: %s)\n", DEFAULT_PID);
+	fprintf(stderr, "  -u <uid>       change process user to <pid> user (default: do not change)\n");
+	fprintf(stderr, "  -g <gid>       change process group to <group> user (default: do not change)\n");
+	fprintf(stderr, "  -f             do not background (default: do)\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "  <host>      a single IP address\n");
 	fprintf(stderr, "  <port>      TCP port on which the server will listen (integer)\n");
 	fprintf(stderr, "  <base>      directory for files\n");
 	fprintf(stderr, "  <response>  file with a response content (system path)\n");
 	fprintf(stderr, "  <index>     filename for a directory response content file\n");
+	fprintf(stderr, "  <pid>       file to store PID\n");
+	fprintf(stderr, "  <uid>       user UID or name\n");
+	fprintf(stderr, "  <gid>       group GID or name\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -149,6 +165,42 @@ int main(int argc, char *argv[]) {
 				return 1;
 			}
 		}
+		else if (strcmp(argv[i], "-d") == 0) {
+			i++;
+			if ((i < argc) && (argv[i][0] != '\0')) {
+				pid_file = argv[i];
+			}
+			else {
+				fprintf(stderr, "Missing parameter for -d argument.\n\n");
+				help();
+				return 1;
+			}
+		}
+		else if (strcmp(argv[i], "-u") == 0) {
+			i++;
+			if ((i < argc) && (argv[i][0] != '\0')) {
+				uid = argv[i];
+			}
+			else {
+				fprintf(stderr, "Missing parameter for -u argument.\n\n");
+				help();
+				return 1;
+			}
+		}
+		else if (strcmp(argv[i], "-g") == 0) {
+			i++;
+			if ((i < argc) && (argv[i][0] != '\0')) {
+				gid = argv[i];
+			}
+			else {
+				fprintf(stderr, "Missing parameter for -g argument.\n\n");
+				help();
+				return 1;
+			}
+		}
+		else if (strcmp(argv[i], "-f") == 0) {
+			foreground = 1;
+		}
 		else {
 			fprintf(stderr, "Invalid argument '%s'.\n\n", argv[i]);
 			help();
@@ -158,8 +210,84 @@ int main(int argc, char *argv[]) {
 
 	server = httpdCreate(host, port);
 	if (server == NULL) {
-		fprintf(stderr, "Could not create HTTP server on %s:%d: %s.\n", (host == NULL ? "*" : host), port, strerror(errno));
+		fprintf(stderr, "Could not create HTTP server on %s:%u: %s.\n", (host == NULL ? "*" : host), port, strerror(errno));
 		return 2;
+	}
+
+	if (gid != NULL) {
+		struct group *gr;
+		if (strspn(gid, "1234567890") != strlen(gid)) {
+			if ((gr = getgrnam(gid)) == NULL) {
+				fprintf(stderr, "Invalid group name '%s'.\n", gid);
+				return 4;
+			}
+		}
+		else {
+			if ((gr = getgrgid(strtol(gid, NULL, 10))) == NULL) {
+				fprintf(stderr, "Invalid group id '%s'.\n", gid);
+				return 4;
+			}
+		}
+
+		if (setgid(gr->gr_gid) == -1) {
+			fprintf(stderr, "Could not set process group to %u/%s: %s.\n", gr->gr_gid, gr->gr_name, strerror(errno));
+			return 5;
+		}
+
+	}
+
+	if (uid != NULL) {
+		struct passwd *pw;
+		if (strspn(uid, "1234567890") != strlen(uid)) {
+			if ((pw = getpwnam(uid)) == NULL) {
+				fprintf(stderr, "Invalid user name '%s'.\n", uid);
+				return 6;
+			}
+		}
+		else {
+			if ((pw = getpwuid(strtol(uid, NULL, 10))) == NULL) {
+				fprintf(stderr, "Invalid user id '%s'.\n", uid);
+				return 6;
+			}
+		}
+
+		if (setuid(pw->pw_uid) == -1) {
+			fprintf(stderr, "Could not set process user to %u/%s: %s.\n", pw->pw_uid, pw->pw_name, strerror(errno));
+			return 7;
+		}
+		// By convention the effective group ID (the first member of the group access list) is
+		// duplicated so we use getegid here and not getgid
+		if (initgroups(pw->pw_name, getegid()) == -1) {
+			fprintf(stderr, "Could not init process groups to %u/%s groups: %s.\n", pw->pw_uid, pw->pw_name, strerror(errno));
+			return 8;
+		}
+	}
+
+	FILE *pid;
+	if ((pid = fopen(pid_file, "w")) == NULL) {
+		fprintf(stderr, "Unable to open PID file '%s': %s.\n", pid_file, strerror(errno));
+		return 9;
+	}
+
+	if (fprintf(pid, "%u\n", getpid()) < 0) {
+		fprintf(stderr, "Could not write to PID file '%s': %s.\n", pid_file, strerror(errno));
+		return 10;
+	}
+
+	if (fclose(pid) != 0) {
+		fprintf(stderr, "Unable to close PID file '%s': %s.\n", pid_file, strerror(errno));
+		return 11;
+	}
+
+	if (!foreground) {
+		int child = fork();
+		if (child > 0) {
+			return 0;
+		}
+		else if (child < 0) {
+			fprintf(stderr, "Could not fork: %s.\n", strerror(errno));
+			return 12;
+		}
 	}
 
 	httpdSetFileBase(server, base);
