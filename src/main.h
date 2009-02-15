@@ -11,6 +11,7 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
+#define VERSION "0.1"
 #define DEFAULT_PORT 2051
 #define DEFAULT_BASE "./"
 #define DEFAULT_INDEX "index.html"
