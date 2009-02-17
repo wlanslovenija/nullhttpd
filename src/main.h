@@ -15,7 +15,6 @@
 #define DEFAULT_PORT 2051
 #define DEFAULT_BASE "./"
 #define DEFAULT_INDEX "index.html"
-#define DEFAULT_PID "/var/run/nullhttpd.pid"
 #define BUFFER_LENGTH 100
 
 // LibHTTPD internal function

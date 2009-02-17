@@ -27,7 +27,7 @@ int port = DEFAULT_PORT;
 char *base = DEFAULT_BASE;
 char *response_file = NULL;
 char *index_file = DEFAULT_INDEX;
-char *pid_file = DEFAULT_PID;
+char *pid_file = NULL;
 char *uid = NULL;
 char *gid = NULL;
 int foreground = 0;
@@ -81,9 +81,9 @@ void help() {
 	fprintf(stderr, "  -b <base>      <base> directory to use (default: %s)\n", DEFAULT_BASE);
 	fprintf(stderr, "  -r <response>  send <response> file as a response (default: empty response)\n");
 	fprintf(stderr, "  -i <index>     send <index> file as a directory response (default: %s)\n", DEFAULT_INDEX);
-	fprintf(stderr, "  -d <pid>       store PID into <pid> file (default: %s)\n", DEFAULT_PID);
-	fprintf(stderr, "  -u <uid>       change process user to <pid> user (default: do not change)\n");
-	fprintf(stderr, "  -g <gid>       change process group to <group> user (default: do not change)\n");
+	fprintf(stderr, "  -d <pid>       store PID into <pid> file (default: do not)\n");
+	fprintf(stderr, "  -u <uid>       change process user to <pid> user (default: do not)\n");
+	fprintf(stderr, "  -g <gid>       change process group to <group> user (default: do not)\n");
 	fprintf(stderr, "  -f             do not background (default: do)\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "  <host>      a single IP address\n");
@@ -260,20 +260,22 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	FILE *pid;
-	if ((pid = fopen(pid_file, "w")) == NULL) {
-		fprintf(stderr, "Unable to open PID file '%s': %s.\n", pid_file, strerror(errno));
-		return 9;
-	}
+	if (pid_file != NULL) {
+		FILE *pid;
+		if ((pid = fopen(pid_file, "w")) == NULL) {
+			fprintf(stderr, "Unable to open PID file '%s': %s.\n", pid_file, strerror(errno));
+			return 9;
+		}
 
-	if (fprintf(pid, "%u\n", getpid()) < 0) {
-		fprintf(stderr, "Could not write to PID file '%s': %s.\n", pid_file, strerror(errno));
-		return 10;
-	}
+		if (fprintf(pid, "%u\n", getpid()) < 0) {
+			fprintf(stderr, "Could not write to PID file '%s': %s.\n", pid_file, strerror(errno));
+			return 10;
+		}
 
-	if (fclose(pid) != 0) {
-		fprintf(stderr, "Unable to close PID file '%s': %s.\n", pid_file, strerror(errno));
-		return 11;
+		if (fclose(pid) != 0) {
+			fprintf(stderr, "Unable to close PID file '%s': %s.\n", pid_file, strerror(errno));
+			return 11;
+		}
 	}
 
 	if (!foreground) {
