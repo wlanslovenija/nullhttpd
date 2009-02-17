@@ -39,42 +39,39 @@ void _debug(char *filename, int line, int level, char *format, ...) {
 }
 
 void null() {
-	if (response_file != NULL) {
-		char *suffix;
-		struct stat sbuf;
-
-		if (stat(response_file, &sbuf) == 0) {
-			suffix = rindex(response_file, '.');
-			if (suffix != NULL) {
-				if (strcasecmp(suffix,".gif") == 0) {
-					httpdSetContentType(req, "image/gif");
-				}
-				else if (strcasecmp(suffix,".jpg") == 0) {
-					httpdSetContentType(req, "image/jpeg");
-				}
-				else if (strcasecmp(suffix,".png") == 0) {
-					httpdSetContentType(req, "image/png");
-				}
-				else if (strcasecmp(suffix,".css") == 0) {
-					httpdSetContentType(req, "text/css");
-				}
-				else if (strcasecmp(suffix,".js") == 0) {
-					httpdSetContentType(req, "text/javascript");
-				}
+	struct stat sbuf;
+	if ((response_file != NULL) && (stat(response_file, &sbuf) == 0)) {
+		char *suffix = rindex(response_file, '.');
+		if (suffix != NULL) {
+			if (strcasecmp(suffix,".gif") == 0) {
+				httpdSetContentType(req, "image/gif");
 			}
-
-			char length[BUFFER_LENGTH];
-			if (snprintf(length, BUFFER_LENGTH, "Content-Length: %lld", sbuf.st_size) <= BUFFER_LENGTH - 1) {
-				httpdAddHeader(req, length);
+			else if (strcasecmp(suffix,".jpg") == 0) {
+				httpdSetContentType(req, "image/jpeg");
 			}
-			httpdSendHeaders(req);
-			_httpd_catFile(req, response_file);
-			return;
+			else if (strcasecmp(suffix,".png") == 0) {
+				httpdSetContentType(req, "image/png");
+			}
+			else if (strcasecmp(suffix,".css") == 0) {
+				httpdSetContentType(req, "text/css");
+			}
+			else if (strcasecmp(suffix,".js") == 0) {
+				httpdSetContentType(req, "text/javascript");
+			}
 		}
-	}
 
-	httpdAddHeader(req, "Content-Length: 0");
-	httpdOutput(req, "");
+		char length[BUFFER_LENGTH];
+		if (snprintf(length, BUFFER_LENGTH, "Content-Length: %lld", sbuf.st_size) <= BUFFER_LENGTH - 1) {
+			httpdAddHeader(req, length);
+		}
+
+		httpdSendHeaders(req);
+		_httpd_catFile(req, response_file);
+	}
+	else {
+		httpdAddHeader(req, "Content-Length: 0");
+		httpdOutput(req, "");
+	}
 }
 
 void help() {
