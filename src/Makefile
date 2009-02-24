@@ -11,7 +11,7 @@
 all: nullhttpd
 
 nullhttpd: main.o
-	$(CC) -lhttpd -o $@ $^
+	$(CC) $(LDFLAGS) -lhttpd -o $@ $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c -I. -o $@ $<
