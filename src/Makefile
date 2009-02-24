@@ -10,7 +10,7 @@
 
 all: nullhttpd
 
-solar: main.o
+nullhttpd: main.o
 	$(CC) -lhttpd -o $@ $^
 
 %.o: %.c
