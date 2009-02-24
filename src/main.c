@@ -263,7 +263,7 @@ int main(int argc, char *argv[]) {
 	if (pid_file != NULL) {
 		FILE *pid;
 		if ((pid = fopen(pid_file, "w")) == NULL) {
-			fprintf(stderr, "Unable to open PID file '%s': %s.\n", pid_file, strerror(errno));
+			fprintf(stderr, "Could not to open PID file '%s': %s.\n", pid_file, strerror(errno));
 			return 9;
 		}
 
@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		if (fclose(pid) != 0) {
-			fprintf(stderr, "Unable to close PID file '%s': %s.\n", pid_file, strerror(errno));
+			fprintf(stderr, "Could not to close PID file '%s': %s.\n", pid_file, strerror(errno));
 			return 11;
 		}
 	}
