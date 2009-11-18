@@ -26,11 +26,12 @@ char *host = NULL;
 int port = DEFAULT_PORT;
 char *base = DEFAULT_BASE;
 char *response_file = NULL;
-char *index_file = DEFAULT_INDEX;
+char *index_file = NULL;
 char *pid_file = NULL;
 char *uid = NULL;
 char *gid = NULL;
 int foreground = 0;
+int disable_cache = 1;
 httpd *server;
 request *req;
 
@@ -64,12 +65,20 @@ void null() {
 		if (snprintf(length, BUFFER_LENGTH, "Content-Length: %lld", sbuf.st_size) <= BUFFER_LENGTH - 1) {
 			httpdAddHeader(req, length);
 		}
+		if (disable_cache) {
+			httpdAddHeader(req, "Cache-Control: no-store, no-cache, must-revalidate");
+			httpdAddHeader(req, "Pragma: no-cache");
+		}
 
 		httpdSendHeaders(req);
 		_httpd_catFile(req, response_file);
 	}
 	else {
 		httpdAddHeader(req, "Content-Length: 0");
+		if (disable_cache) {
+			httpdAddHeader(req, "Cache-Control: no-store, no-cache, must-revalidate");
+			httpdAddHeader(req, "Pragma: no-cache");
+		}
 		httpdOutput(req, "");
 	}
 }
@@ -79,11 +88,12 @@ void help() {
 	fprintf(stderr, "  -h <host>      to which <host> to bind (default: all available)\n");
 	fprintf(stderr, "  -p <port>      to which <port> to bind (default: %u)\n", DEFAULT_PORT);
 	fprintf(stderr, "  -b <base>      <base> directory to use (default: %s)\n", DEFAULT_BASE);
-	fprintf(stderr, "  -r <response>  send <response> file as a response (default: empty response)\n");
-	fprintf(stderr, "  -i <index>     send <index> file as a directory response (default: %s)\n", DEFAULT_INDEX);
+	fprintf(stderr, "  -r <response>  send <response> file as a default content response (default: empty response)\n");
+	fprintf(stderr, "  -i <index>     send <index> file as a directory response (default: default content response)\n");
 	fprintf(stderr, "  -d <pid>       store PID into <pid> file (default: do not)\n");
 	fprintf(stderr, "  -u <uid>       change process user to <pid> user (default: do not)\n");
 	fprintf(stderr, "  -g <gid>       change process group to <group> user (default: do not)\n");
+	fprintf(stderr, "  -c             do not disable default content response caching (default: do)\n");
 	fprintf(stderr, "  -f             do not background (default: do)\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "  <host>      a single IP address\n");
@@ -195,6 +205,9 @@ int main(int argc, char *argv[]) {
 				return 1;
 			}
 		}
+		else if (strcmp(argv[i], "-c") == 0) {
+			disable_cache = 0;
+		}
 		else if (strcmp(argv[i], "-f") == 0) {
 			foreground = 1;
 		}
@@ -292,7 +305,9 @@ int main(int argc, char *argv[]) {
 	httpdSetFileBase(server, base);
 
 	httpdAddWildcardContent(server, "/", NULL, "");
-	httpdAddFileContent(server, "/", index_file, HTTP_TRUE, NULL, index_file);
+	if (index_file != NULL) {
+		httpdAddFileContent(server, "/", index_file, HTTP_TRUE, NULL, index_file);
+	}
 	httpdAddC404Content(server, null);
 
 	while ((req = httpdGetConnection(server, NULL)) != NULL) {
