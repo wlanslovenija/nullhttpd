@@ -273,6 +273,17 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	if (!foreground) {
+		int child = fork();
+		if (child > 0) {
+			return 0;
+		}
+		else if (child < 0) {
+			fprintf(stderr, "Could not fork: %s.\n", strerror(errno));
+			return 12;
+		}
+	}
+
 	if (pid_file != NULL) {
 		FILE *pid;
 		if ((pid = fopen(pid_file, "w")) == NULL) {
@@ -288,17 +299,6 @@ int main(int argc, char *argv[]) {
 		if (fclose(pid) != 0) {
 			fprintf(stderr, "Could not to close PID file '%s': %s.\n", pid_file, strerror(errno));
 			return 11;
-		}
-	}
-
-	if (!foreground) {
-		int child = fork();
-		if (child > 0) {
-			return 0;
-		}
-		else if (child < 0) {
-			fprintf(stderr, "Could not fork: %s.\n", strerror(errno));
-			return 12;
 		}
 	}
 
