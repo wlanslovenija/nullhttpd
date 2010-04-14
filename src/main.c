@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <signal.h>
 #include <pwd.h>
 #include <grp.h>
 #include <httpd.h>
@@ -229,19 +230,19 @@ int main(int argc, char *argv[]) {
 		if (strspn(gid, "1234567890") != strlen(gid)) {
 			if ((gr = getgrnam(gid)) == NULL) {
 				fprintf(stderr, "Invalid group name '%s'.\n", gid);
-				return 4;
+				return 3;
 			}
 		}
 		else {
 			if ((gr = getgrgid(strtol(gid, NULL, 10))) == NULL) {
 				fprintf(stderr, "Invalid group id '%s'.\n", gid);
-				return 4;
+				return 3;
 			}
 		}
 
 		if (setgid(gr->gr_gid) == -1) {
 			fprintf(stderr, "Could not set process group to %u/%s: %s.\n", gr->gr_gid, gr->gr_name, strerror(errno));
-			return 5;
+			return 3;
 		}
 
 	}
@@ -251,26 +252,35 @@ int main(int argc, char *argv[]) {
 		if (strspn(uid, "1234567890") != strlen(uid)) {
 			if ((pw = getpwnam(uid)) == NULL) {
 				fprintf(stderr, "Invalid user name '%s'.\n", uid);
-				return 6;
+				return 4;
 			}
 		}
 		else {
 			if ((pw = getpwuid(strtol(uid, NULL, 10))) == NULL) {
 				fprintf(stderr, "Invalid user id '%s'.\n", uid);
-				return 6;
+				return 4;
 			}
 		}
 
 		if (setuid(pw->pw_uid) == -1) {
 			fprintf(stderr, "Could not set process user to %u/%s: %s.\n", pw->pw_uid, pw->pw_name, strerror(errno));
-			return 7;
+			return 4;
 		}
 		// By convention the effective group ID (the first member of the group access list) is
 		// duplicated so we use getegid here and not getgid
 		if (initgroups(pw->pw_name, getegid()) == -1) {
 			fprintf(stderr, "Could not init process groups to %u/%s groups: %s.\n", pw->pw_uid, pw->pw_name, strerror(errno));
-			return 8;
+			return 4;
 		}
+	}
+
+	struct sigaction action;
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+	action.sa_handler = SIG_IGN;
+	if (sigaction(SIGPIPE, &action, NULL) == -1) {
+		fprintf(stderr, "Could not set signal ignore: %s.\n", strerror(errno));
+		return 5;
 	}
 
 	if (!foreground) {
@@ -280,7 +290,7 @@ int main(int argc, char *argv[]) {
 		}
 		else if (child < 0) {
 			fprintf(stderr, "Could not fork: %s.\n", strerror(errno));
-			return 12;
+			return 5;
 		}
 	}
 
@@ -288,17 +298,17 @@ int main(int argc, char *argv[]) {
 		FILE *pid;
 		if ((pid = fopen(pid_file, "w")) == NULL) {
 			fprintf(stderr, "Could not to open PID file '%s': %s.\n", pid_file, strerror(errno));
-			return 9;
+			return 5;
 		}
 
 		if (fprintf(pid, "%u\n", getpid()) < 0) {
 			fprintf(stderr, "Could not write to PID file '%s': %s.\n", pid_file, strerror(errno));
-			return 10;
+			return 5;
 		}
 
 		if (fclose(pid) != 0) {
 			fprintf(stderr, "Could not to close PID file '%s': %s.\n", pid_file, strerror(errno));
-			return 11;
+			return 5;
 		}
 	}
 
