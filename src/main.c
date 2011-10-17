@@ -1,13 +1,3 @@
-/*
- * Mitar <mitar@tnode.com>
- * http://mitar.tnode.com/
- * In kind public domain.
- *
- * $Id$
- * $Revision$
- * $HeadURL$
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>

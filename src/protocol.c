@@ -661,7 +661,7 @@ int _httpd_sendDirectoryEntry(httpd *server, request *r, httpContent *entry,
 		char *entryName)
 {
 	char		path[HTTP_MAX_URL];
-	/* We do not want to serve directory entry directly.  (Mitar) */ 
+	/* We do not want to serve directory entry directly. */ 
 	if (entryName[0] == '\0') { 
 	  return(-1); 
 	} 
